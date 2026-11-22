@@ -290,6 +290,8 @@ input[type=number]{width:64px}
 #cpitch.drawing{cursor:crosshair}
 #cpitch.drawing .pl,#cpitch.drawing .ballTok{pointer-events:none}
 
+.pl .carry{position:absolute;left:calc(var(--S)*-.12);bottom:calc(var(--S)*-.08);width:calc(var(--S)*.62);height:calc(var(--S)*.62);z-index:6;pointer-events:none;filter:drop-shadow(0 0 1px #fff) drop-shadow(0 0 1px #fff) drop-shadow(0 2px 2px #000b)}
+
 </style>
 </head>
 <body>
@@ -807,8 +809,8 @@ function tokenInner(p, lane) {
   let h = `<div class="stack">${sprite(p)}`;
   if (p.st === 'prone') h += '<i class="ic ic-prone ov"></i>';
   if (p.st === 'stun') h += '<i class="ic ic-stunned ov"></i>';
-  if (S.ball.carrier === p.id && p.loc === 'pitch') h += '<i class="ic ic-hold ov"></i>';
   h += '</div>';
+  if (S.ball.carrier === p.id && p.loc === 'pitch') h += '<i class="ic ic-ball carry"></i>';
   if (S.show.nums !== false) h += `<b class="num">${esc(p.n)}</b>`;
   if (S.show.names && p.loc === 'pitch') h += `<span class="nm">${esc(p.name)}</span>`;
   return h;
