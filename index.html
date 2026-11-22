@@ -277,6 +277,19 @@ input[type=number]{width:64px}
 .stlogo b{font:900 22px/1 var(--disp);letter-spacing:.14em;text-transform:uppercase;color:var(--txt)}
 .stlogo b small{display:block;font:700 12px var(--body);letter-spacing:.2em;color:var(--orange);margin-top:3px}
 
+/* ---------- dibujo ---------- */
+#cdraw{display:flex;align-items:center;gap:6px;flex-wrap:wrap;flex:none;background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:6px 8px}
+#cdraw .dsep{width:1px;height:24px;background:var(--line);margin:0 4px}
+#cdraw .chip{padding:4px 10px;font-size:13px}
+#cdraw .chip[disabled]{opacity:.35;pointer-events:none}
+#cdraw .dshow{display:flex;gap:6px;align-items:center;margin-left:4px}
+.swatch{width:24px;height:24px;border-radius:50%;border:2px solid #ffffff55;padding:0;position:relative;display:inline-block;cursor:pointer}
+.swatch.on{border-color:#fff;box-shadow:0 0 0 2px var(--orange)}
+.swatch.custom input{position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer;padding:0;border:0}
+.swatch.custom::after{content:"+";position:absolute;inset:0;display:grid;place-items:center;font:900 15px/1 var(--disp);color:#fff;text-shadow:0 0 3px #000}
+#cpitch.drawing{cursor:crosshair}
+#cpitch.drawing .pl,#cpitch.drawing .ballTok{pointer-events:none}
+
 </style>
 </head>
 <body>
@@ -691,6 +704,7 @@ input[type=number]{width:64px}
   <header id="cbar"></header>
   <main id="cmain">
     <section id="cleft">
+      <div id="cdraw"></div>
       <div id="cpitchWrap"><div id="cpitch"></div></div>
       <div id="cdug"></div>
     </section>
@@ -773,7 +787,7 @@ function typicalRoster(rk) {
 }
 function freshState() {
   const s = { v: 1, seq: 0, teams: [newTeam(0), newTeam(1)], half: 1, turn: [0, 0], active: null, kicking: null, weather: 'nice', kickEv: null,
-    ball: { x: null, y: null, carrier: null }, rolls: [], log: [], fx: null, focus: null, show: { names: false, grid: false, nums: true } };
+    ball: { x: null, y: null, carrier: null }, rolls: [], log: [], fx: null, focus: null, draw: [], drawShow: true, show: { names: false, grid: false, nums: true } };
   s.teams.forEach((t, ti) => { t.players = typicalRoster(t.race); });
   fixIds(s); return s;
 }
@@ -839,8 +853,28 @@ class PitchView {
         svg = `<defs><marker id="ah" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="3.2" markerHeight="3.2" orient="auto"><path d="M0 0L10 5L0 10z" fill="#f2b632"/></marker></defs><line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="#000" stroke-opacity=".5" stroke-width=".2" stroke-linecap="round"/><line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="#f2b632" stroke-width=".13" stroke-linecap="round" marker-end="url(#ah)"/>`;
       }
     }
-    if (this.svg.innerHTML !== svg) this.svg.innerHTML = svg;
+    svg = strokesSVG() + svg;
+    if (this._svgStr !== svg) { this._svgStr = svg; this.svg.innerHTML = svg; }
   }
+}
+const okColor = c => /^#[0-9a-f]{6}$/i.test(c) ? c : '#f2b632';
+function strokeSVG(st) {
+  const pts = st.pts, c = okColor(st.c), w = +st.w || .14;
+  const d = 'M' + pts.map(q => (+q[0]).toFixed(3) + ' ' + (+q[1]).toFixed(3)).join('L');
+  let head = '';
+  if (st.k !== 'pen' && pts.length > 1) {
+    const e = pts[pts.length - 1]; let b = pts[0];
+    for (let i = pts.length - 2; i >= 0; i--) if (Math.hypot(e[0] - pts[i][0], e[1] - pts[i][1]) > .3) { b = pts[i]; break; }
+    const dx = e[0] - b[0], dy = e[1] - b[1], L = Math.hypot(dx, dy) || 1, ux = dx / L, uy = dy / L, hl = Math.max(.45, w * 3.4), hw = hl * .55, bx = e[0] - ux * hl, by = e[1] - uy * hl;
+    head = `${e[0]},${e[1]} ${bx - uy * hw},${by + ux * hw} ${bx + uy * hw},${by - ux * hw}`;
+  }
+  const dash = st.d ? `stroke-dasharray="${w * 2.3} ${w * 1.9}"` : '';
+  return `<g><path d="${d}" stroke="#000" stroke-opacity=".5" stroke-width="${w + .07}" fill="none" stroke-linecap="round" stroke-linejoin="round" ${dash}/><path d="${d}" stroke="${c}" stroke-width="${w}" fill="none" stroke-linecap="round" stroke-linejoin="round" ${dash}/>${head ? `<polygon points="${head}" fill="${c}" stroke="#000" stroke-opacity=".5" stroke-width=".06" stroke-linejoin="round"/>` : ''}</g>`;
+}
+function strokesSVG() {
+  if (!S.draw || !S.draw.length) return '';
+  if (MODE !== 'ctl' && S.drawShow === false) return '';
+  return S.draw.map(strokeSVG).join('');
 }
 function dugHTML(ti, opts) {
   const t = S.teams[ti]; let h = '';
@@ -1007,6 +1041,14 @@ const ACT = {
   export: () => download('partido-bb.json', JSON.stringify(S)),
   import: () => pickFile(txt => { try { pushHist(); S = JSON.parse(txt); fixIds(S); commit(); toast('Partido cargado'); } catch (e) { toast('Archivo inválido'); } }),
   setspr: d => { closeModal(); act(() => { const p = S.teams[+d.t].players[+d.i]; p.sheet = d.sh; p.pos = d.pos; p.v = 0; }); },
+  drawtoggle: () => { D.on = !D.on; D.cur = null; renderCtl(true); },
+  dtool: d => { D.t = d.v; renderDraw(); },
+  dcolor: d => { D.c = d.v; renderDraw(); },
+  dwidth: d => { D.w = +d.v; renderDraw(); },
+  ddash: () => { D.dash = !D.dash; renderDraw(); },
+  undostroke: () => act(() => { S.draw.pop(); }, null, { keepTeams: true }),
+  cleardraw: () => { if (!S.draw.length) return; act(() => { S.draw = []; }, null, { keepTeams: true }); },
+  drawshow: () => act(() => { S.drawShow = !S.drawShow; }, null, { keepTeams: true }),
   libsave: d => { const lib = getLib(), t = S.teams[+d.t]; const k = t.name || 'Equipo'; lib[k] = { ...t, form: null, score: 0, players: t.players.map(p => ({ ...p, loc: 'res', x: null, y: null, st: 'up', cas: '' })) }; setLib(lib); toast('Guardado en la biblioteca: ' + k); renderCtl(); },
   libload: d => { const sel2 = $(`#lib${d.t}`); const k = sel2 && sel2.value; if (!k) return; const lib = getLib(); if (!lib[k]) return; act(() => { const t = JSON.parse(JSON.stringify(lib[k])); if (S.ball.carrier && S.teams[+d.t].players.some(p => p.id === S.ball.carrier)) S.ball = { x: null, y: null, carrier: null }; S.teams[+d.t] = t; t.players.forEach(p => { p.id = ''; }); fixIds(S); t.rr = t.rrMax; }); },
   libdel: d => { const k = $(`#lib${d.t}`).value; if (!k || !confirm('¿Borrar "' + k + '" de la biblioteca?')) return; const lib = getLib(); delete lib[k]; setLib(lib); renderCtl(); },
@@ -1031,6 +1073,24 @@ function selectPlayer(id) {
   renderCtl(true);
 }
 
+/* ---------- dibujo sobre la cancha ---------- */
+const D = { on: false, t: 'pen', c: '#f2b632', w: .14, dash: false, cur: null, pushed: false };
+const DCOL = ['#f2b632', '#ff4d3d', '#3aa0ff', '#5fdc7e', '#ffffff', '#111111', '#ff7ad9'];
+function renderDraw() {
+  const el = $('#cdraw'); if (!el) return;
+  $('#cpitch').classList.toggle('drawing', D.on);
+  const n = S.draw.length;
+  let h = `<button class="btn ${D.on ? 'on' : ''}" data-act="drawtoggle">✏ Dibujar${D.on ? ': activado' : ''}</button>`;
+  if (D.on) {
+    h += `<span class="dsep"></span>` + [['pen', 'Lápiz'], ['arrow', 'Flecha curva'], ['line', 'Flecha recta'], ['erase', 'Borrador']].map(([k, l]) => `<button class="chip ${D.t === k ? 'on' : ''}" data-act="dtool" data-v="${k}">${l}</button>`).join('');
+    h += `<button class="chip ${D.dash ? 'on' : ''}" data-act="ddash" ${D.t === 'erase' ? 'disabled' : ''}>Punteada</button><span class="dsep"></span>`;
+    h += DCOL.map(c => `<button class="swatch ${D.c.toLowerCase() === c ? 'on' : ''}" style="background:${c}" data-act="dcolor" data-v="${c}" title="${c}"></button>`).join('') + `<label class="swatch custom ${DCOL.includes(D.c.toLowerCase()) ? '' : 'on'}" title="Otro color" style="background:${esc(D.c)}"><input type="color" id="dcustom" value="${esc(D.c)}"></label><span class="dsep"></span>`;
+    h += [[.08, 'Fino'], [.14, 'Medio'], [.24, 'Grueso']].map(([w, l]) => `<button class="chip ${D.w === w ? 'on' : ''}" data-act="dwidth" data-v="${w}">${l}</button>`).join('');
+  }
+  h += `<span class="sp1"></span><button class="btn sm" data-act="undostroke" ${n ? '' : 'disabled'}>↶ Trazo</button><button class="btn sm bad" data-act="cleardraw" ${n ? '' : 'disabled'}>Borrar todo</button>
+    <label class="hint dshow"><input type="checkbox" data-act="drawshow" ${S.drawShow !== false ? 'checked' : ''}> Ver en transmisión</label>`;
+  el.innerHTML = h;
+}
 /* ---------- render control ---------- */
 let pv = null;
 function cellSize() {
@@ -1042,7 +1102,7 @@ function renderCtl(keepTeams) {
   if (MODE !== 'ctl') return;
   const Sz = cellSize();
   if (!pv) pv = new PitchView($('#cpitch'), Sz);
-  pv.setS(Sz); pv.update();
+  pv.setS(Sz); pv.update(); renderDraw();
   document.documentElement.style.setProperty('--DS', clamp(Math.round(Sz * .95), 22, 40) + 'px');
   // barra
   const a = S.teams[0], b = S.teams[1];
@@ -1157,6 +1217,7 @@ if (MODE === 'ctl') {
   document.addEventListener('change', e => {
     const t = e.target;
     if (t.dataset.act === 'showopt') return ACT.showopt(t.dataset);
+    if (t.dataset.act === 'drawshow') return ACT.drawshow();
     if (t.id === 'applychk') { entry.apply = t.checked; return; }
     if (t.id === 'rlabel') { entry.label = t.value; return; }
     if (t.dataset.f) { const ti = +t.dataset.t, f = t.dataset.f; act(() => { const T = S.teams[ti]; let v = t.dataset.v != null ? +t.dataset.v : t.value; if (['rrMax', 'apo', 'col'].includes(f)) v = +v; T[f] = v; if (f === 'rrMax') { T.rr = v; } }, null, { keepTeams: f !== 'col' && f !== 'name' ? true : false }); if (f === 'col') renderCtl(); return; }
@@ -1165,14 +1226,39 @@ if (MODE === 'ctl') {
   document.addEventListener('click', e => { const b = e.target.closest('[data-f][data-v]'); if (b && b.tagName === 'BUTTON') { const ti = +b.dataset.t; act(() => { S.teams[ti][b.dataset.f] = +b.dataset.v; }); } });
   document.addEventListener('keydown', e => {
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') { e.preventDefault(); e.shiftKey ? rehacer() : undo(); }
+    if (e.key.toLowerCase() === 'd' && !/INPUT|SELECT|TEXTAREA/.test(e.target.tagName) && !e.ctrlKey && !e.metaKey) { ACT.drawtoggle(); }
     if (e.key === 'Escape') { if (!$('#modal').hidden) closeModal(); else { sel = []; renderCtl(true); } }
   });
 
+  /* dibujo con puntero */
+  const penPt = e => { const pc = $('#cpitch'), r = pc.getBoundingClientRect(), cs = parseFloat(getComputedStyle(pc).borderLeftWidth) || 0, S0 = parseFloat(getComputedStyle(pc).getPropertyValue('--S')) || 36; return [clamp((e.clientX - r.left - cs) / S0, 0, W), clamp((e.clientY - r.top - cs) / S0, 0, H)]; };
+  const distSeg = (p, a, b) => { const dx = b[0] - a[0], dy = b[1] - a[1], L2 = dx * dx + dy * dy || 1e-9; const t = clamp(((p[0] - a[0]) * dx + (p[1] - a[1]) * dy) / L2, 0, 1); return Math.hypot(p[0] - a[0] - t * dx, p[1] - a[1] - t * dy); };
+  const eraseAt = p => { const keep = S.draw.filter(st => { for (let i = 0; i < st.pts.length - 1 || i === 0; i++) { const a = st.pts[i], b = st.pts[i + 1] || a; if (distSeg(p, a, b) < .45 + st.w) return false; } return true; }); if (keep.length !== S.draw.length) { if (!D.pushed) { pushHist(); D.pushed = true; } S.draw = keep; pv.update(); return true; } return false; };
+  let lastPub = 0;
+  $('#cpitch').addEventListener('pointerdown', e => {
+    if (!D.on || e.button > 0) return; e.preventDefault(); $('#cpitch').setPointerCapture(e.pointerId);
+    const p = penPt(e); D.pushed = false;
+    if (D.t === 'erase') { D.cur = 'erase'; eraseAt(p); return; }
+    pushHist(); const st = { id: Date.now() + Math.random(), k: D.t, c: D.c, w: D.w, d: D.dash, pts: [p, p] }; S.draw.push(st); D.cur = st; pv.update();
+  });
+  $('#cpitch').addEventListener('pointermove', e => {
+    if (!D.on || !D.cur) return; const p = penPt(e);
+    if (D.cur === 'erase') { eraseAt(p); } else {
+      const st = D.cur, last = st.pts[st.pts.length - 1];
+      if (st.k === 'line') st.pts[1] = p; else if (Math.hypot(p[0] - last[0], p[1] - last[1]) > .05) st.pts.push(p); else return;
+      pv.update();
+    }
+    if (Date.now() - lastPub > 70) { lastPub = Date.now(); publish(); }
+  });
+  const endPen = () => { if (!D.cur) return; const st = D.cur; D.cur = null; if (st !== 'erase' && st.k !== 'pen' && Math.hypot(st.pts[st.pts.length - 1][0] - st.pts[0][0], st.pts[st.pts.length - 1][1] - st.pts[0][1]) < .3) { S.draw = S.draw.filter(x => x !== st); hist.pop(); } commit(true); };
+  $('#cpitch').addEventListener('pointerup', endPen); $('#cpitch').addEventListener('pointercancel', endPen);
+  document.addEventListener('input', e => { if (e.target.id === 'dcustom') D.c = e.target.value; });
+  document.addEventListener('change', e => { if (e.target.id === 'dcustom') { D.c = e.target.value; renderDraw(); } });
   /* arrastrar y soltar con puntero (mouse y tacto) */
   let drag = null;
   const stepFor = () => parseFloat(getComputedStyle($('#cpitch')).getPropertyValue('--S')) || 36;
   document.addEventListener('pointerdown', e => {
-    if (e.button > 0) return;
+    if (e.button > 0 || D.on) return;
     const el = e.target.closest('.pl[data-id], .ballTok'); if (!el || !el.closest('#ctl')) return;
     if (el.closest('.sel-card, .ptable')) return;
     drag = { el, id: el.dataset.id, sx: e.clientX, sy: e.clientY, on: false, fromPitch: !!el.closest('#cpitch'), t0: Date.now() };
@@ -1292,7 +1378,7 @@ function showBanner(fx) {
 
 /* ======================== arranque ======================== */
 function load() {
-  try { const j = JSON.parse(localStorage.getItem(LS)); if (j && j.teams) { S = j; fixIds(S); return; } } catch (e) { }
+  try { const j = JSON.parse(localStorage.getItem(LS)); if (j && j.teams) { S = j; S.draw = S.draw || []; if (S.drawShow == null) S.drawShow = true; fixIds(S); return; } } catch (e) { }
   S = freshState();
 }
 load();
