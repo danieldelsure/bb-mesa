@@ -38,8 +38,8 @@ body.ctl #streamRoot{display:none}
 .pl .sp{transition:opacity .2s,filter .2s;filter:drop-shadow(0 calc(var(--S)*.04) calc(var(--S)*.04) #0008)}
 .pl.prone .sp,.pl.stun .sp{opacity:.62}
 .pl .ov{position:absolute;inset:0;pointer-events:none}
-.pl .num{position:absolute;right:calc(var(--S)*-.02);bottom:calc(var(--S)*.0);font:900 calc(var(--S)*.4)/1 var(--disp);color:#fff;background:var(--tc,#000);border:1px solid #000a;padding:calc(var(--S)*.02) calc(var(--S)*.08) 0;border-radius:calc(var(--S)*.1);min-width:calc(var(--S)*.38);text-align:center;pointer-events:none;letter-spacing:.02em}
-.pl .nm{position:absolute;top:100%;left:50%;transform:translateX(-50%);margin-top:calc(var(--S)*-.12);white-space:nowrap;font:700 calc(var(--S)*.3)/1 var(--body);color:#fff;background:#000b;padding:calc(var(--S)*.04) calc(var(--S)*.12);border-radius:3px;pointer-events:none;z-index:3;max-width:calc(var(--S)*3.2);overflow:hidden;text-overflow:ellipsis}
+.pl .num,.nb .num{position:absolute;right:calc(var(--S)*-.02);bottom:calc(var(--S)*.0);font:900 calc(var(--S)*.4)/1 var(--disp);color:#fff;background:var(--tc,#000);border:1px solid #000a;padding:calc(var(--S)*.02) calc(var(--S)*.08) 0;border-radius:calc(var(--S)*.1);min-width:calc(var(--S)*.38);text-align:center;pointer-events:none;letter-spacing:.02em}
+.pl .nm,.nb .nm{position:absolute;top:100%;left:50%;transform:translateX(-50%);margin-top:calc(var(--S)*-.12);white-space:nowrap;font:700 calc(var(--S)*.3)/1 var(--body);color:#fff;background:#000b;padding:calc(var(--S)*.04) calc(var(--S)*.12);border-radius:3px;pointer-events:none;z-index:3;max-width:calc(var(--S)*3.2);overflow:hidden;text-overflow:ellipsis}
 .pl.selA .stack::before,.pl.selB .stack::before,.pl.focA .stack::before,.pl.focB .stack::before{content:"";position:absolute;inset:calc(var(--S)*.04);border:calc(var(--S)*.07) solid var(--gold);border-radius:calc(var(--S)*.14);background:#f2b63233;box-shadow:0 0 calc(var(--S)*.3) #f2b632aa;z-index:0}
 .pl.selB .stack::before,.pl.focB .stack::before{border-color:#ff5a48;background:#ff5a4833;box-shadow:0 0 calc(var(--S)*.3) #ff5a48aa}
 .pl .stack>*{position:relative;z-index:1}
@@ -327,6 +327,9 @@ input[type=number]{width:64px}
 #stage .fichas{z-index:55}
 #stage .sframe{z-index:1}
 #stage .sside{z-index:2}
+
+.pl .nm b,.nb .nm b{font-weight:900;color:#ffd24d;margin-right:.1em}
+.nb .nm{max-width:calc(var(--S)*4.2)}
 
 </style>
 </head>
@@ -881,7 +884,7 @@ function tokenInner(p, noLabels) {
 function labelsHTML(p) {
   let h = '';
   if (S.show.nums !== false) h += `<b class="num">${esc(p.n)}</b>`;
-  if (S.show.names && p.loc === 'pitch') h += `<span class="nm">${esc(p.name)}</span>`;
+  if (S.show.names && p.loc === 'pitch') h += `<span class="nm"><b>#${esc(p.n)}</b> ${esc(p.name)}</span>`;
   return h;
 }
 const tokSig = p => [p.sheet, p.v, S.teams[p.t].col, p.st, p.n, p.name, S.show.names, S.show.nums, S.ball.carrier === p.id].join('|');
