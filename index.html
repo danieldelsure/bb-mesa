@@ -331,6 +331,8 @@ input[type=number]{width:64px}
 .pl .nm b,.nb .nm b{font-weight:900;color:#ffd24d;margin-right:.1em}
 .nb .nm{max-width:calc(var(--S)*4.2)}
 
+.dcard.l:not(.on){transform:translateX(-130%)}
+
 </style>
 </head>
 <body>
@@ -1440,6 +1442,29 @@ function renderStream() {
 function diceHTML(r, size) {
   return r.types.map((t, i) => t === 'b' ? `<div class="rdie b ${r.pick === i ? 'pick' : ''} ${r.pick != null && r.pick !== i ? 'dim' : ''}"><i class="ic ic-d_${FACES[r.dice[i]][0]}"></i></div>` : `<div class="rdie ${t}">${t === 'd8' ? ARROWS[r.dice[i] - 1] : r.dice[i]}</div>`).join('');
 }
+/* el cartel de dados elige la esquina donde menos tapa a los jugadores de la jugada y a las fichas */
+function placeDice(c, r) {
+  const CW = 528, CH = 340, X0 = 33, Y0 = 127, SS = 58;
+  const slots = [{ n: 'tr', left: 1920 - 430 - CW, top: 150 }, { n: 'tl', left: 42, top: 150 }, { n: 'br', left: 1920 - 430 - CW, top: 655 }, { n: 'bl', left: 42, top: 655 }];
+  const hit = (a, b) => a.l < b.r && a.r > b.l && a.t < b.b && a.b > b.t;
+  const cellR = q => ({ l: X0 + q.x * SS - 14, r: X0 + (q.x + 1) * SS + 14, t: Y0 + q.y * SS - 14, b: Y0 + (q.y + 1) * SS + 14 });
+  const key = [byId(r.a), byId(r.b)].filter(q => q && q.loc === 'pitch'), keyIds = new Set(key.map(q => q.id));
+  const others = allP().filter(q => q.loc === 'pitch' && !keyIds.has(q.id));
+  const nf = $('#fichas').children.length, fTop = $('#fichas').classList.contains('top');
+  const fr = nf ? { l: 42, r: 42 + nf * 534, t: fTop ? 136 : 822, b: fTop ? 300 : 985 } : null;
+  let best = null;
+  for (const sl of slots) {
+    const R = { l: sl.left, r: sl.left + CW, t: sl.top, b: sl.top + CH };
+    let sc = (sl.n === 'tr' ? 0 : sl.n === 'tl' ? .1 : .2);
+    key.forEach(q => { if (hit(R, cellR(q))) sc += 100; });
+    others.forEach(q => { if (hit(R, cellR(q))) sc += 1; });
+    if (fr && hit(R, fr)) sc += 60;
+    if (!best || sc < best.sc) best = { sc, sl };
+  }
+  const sl = best.sl;
+  c.style.right = 'auto'; c.style.left = sl.left + 'px'; c.style.top = sl.top + 'px';
+  c.classList.toggle('l', sl.left < 900);
+}
 function showDice(fx) {
   const r = fx.roll, c = $('#dcard'), A = byId(r.a), B = byId(r.b);
   const pl = A || B;
@@ -1448,6 +1473,7 @@ function showDice(fx) {
     <div class="dd">${diceHTML(r)}</div>
     ${r.kind === 'block' && r.pick != null ? `<div class="dr gold">${FACES[r.dice[r.pick]][1]}</div>` : r.res ? `<div class="dr ${r.res.cls}">${esc(r.res.txt)}${r.res.sub ? `<small>${esc(r.res.sub)}</small>` : ''}</div>` : (r.kind === 'block' ? `<div class="dr" style="font-size:24px;color:var(--dim)">${faceTxt.length === 1 ? faceTxt[0] : ''}</div>` : '')}`;
   clearTimeout(dcardTimer); clearInterval(tumbleTimer);
+  if (!fx.keep) { c.classList.remove('on'); placeDice(c, r); }
   if (fx.keep) { c.innerHTML = finalHTML(); c.classList.add('on'); c.classList.remove('tumble'); }
   else {
     c.classList.add('on', 'tumble'); let k = 0;
