@@ -882,10 +882,11 @@ function tokenInner(p, noLabels) {
   return h;
 }
 function labelsHTML(p) {
-  let h = '';
-  if (S.show.nums !== false) h += `<b class="num">${esc(p.n)}</b>`;
-  if (S.show.names && p.loc === 'pitch') h += `<span class="nm"><b>#${esc(p.n)}</b> ${esc(p.name)}</span>`;
-  return h;
+  const nm = S.show.nums !== false, na = !!S.show.names;
+  if (p.loc !== 'pitch' && !(nm && p.loc)) return '';
+  if (!nm && !(na && p.loc === 'pitch')) return '';
+  if (p.loc !== 'pitch') return `<b class="num">${esc(p.n)}</b>`;
+  return `<span class="nm">${nm ? `<b>#${esc(p.n)}</b>` : ''}${nm && na ? ' ' : ''}${na ? esc(p.name) : ''}</span>`;
 }
 const tokSig = p => [p.sheet, p.v, S.teams[p.t].col, p.st, p.n, p.name, S.show.names, S.show.nums, S.ball.carrier === p.id].join('|');
 
